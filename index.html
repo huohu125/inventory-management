@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>仓库库存数据管理系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#64748b',
+                        accent: '#f97316',
+                        neutral: '#f1f5f9',
+                        'neutral-dark': '#334155',
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .transition-custom {
+                transition: all 0.3s ease;
+            }
+            .shadow-custom {
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            }
+            .hover-scale {
+                transition: transform 0.2s ease;
+            }
+            .hover-scale:hover {
+                transform: scale(1.02);
+            }
+            .gradient-bg {
+                background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            }
+            .animate-fade-in {
+                animation: fadeIn 0.5s ease-in-out;
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .sidebar-item {
+                @apply flex items-center px-4 py-3 text-gray-700 hover:bg-primary/10 hover:text-primary rounded-lg transition-custom;
+            }
+            .sidebar-item.active {
+                @apply bg-primary/10 text-primary font-medium;
+            }
+        }
+    </style>
+</head>
+<body class="font-inter bg-gray-50 min-h-screen flex flex-col">
+    <!-- 导航栏 -->
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-warehouse text-2xl"></i>
+                <h1 class="text-xl md:text-2xl font-bold">仓库库存数据管理系统</h1>
+            </div>
+            <div class="hidden md:flex items-center space-x-6">
+                <a href="#data-entry" id="nav-data-entry" class="text-white hover:text-blue-200 transition-custom font-medium">数据录入</a>
+                <a href="#data-view" id="nav-data-view" class="text-white hover:text-blue-200 transition-custom font-medium">数据查看</a>
+            </div>
+            <button id="mobile-menu-button" class="md:hidden text-white">
+                <i class="fa-solid fa-bars text-xl"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- 移动端菜单 -->
+    <div id="mobile-menu" class="fixed inset-0 bg-black bg-opacity-50 z-40 transform translate-x-full transition-transform duration-300 md:hidden">
+        <div class="bg-white h-full w-64 shadow-lg p-4 flex flex-col">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-lg font-semibold text-gray-900">菜单</h3>
+                <button id="close-mobile-menu" class="text-gray-500">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+            <div class="flex flex-col space-y-2">
+                <a href="#data-entry" id="mobile-nav-data-entry" class="sidebar-item">
+                    <i class="fa-solid fa-pencil-alt mr-3"></i>
+                    <span>数据录入</span>
+                </a>
+                <a href="#data-view" id="mobile-nav-data-view" class="sidebar-item">
+                    <i class="fa-solid fa-table mr-3"></i>
+                    <span>数据查看</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 状态通知 -->
+    <div id="notification" class="fixed top-4 right-4 p-4 rounded-lg shadow-lg transform transition-all duration-300 translate-y-[-100px] opacity-0 z-50 flex items-center">
+        <i id="notification-icon" class="mr-2 text-xl"></i>
+        <span id="notification-message"></span>
+    </div>
+
+    <!-- 主要内容 -->
+    <main class="flex-grow container mx-auto px-4 py-8">
+        <!-- 数据录入页面 -->
+        <section id="data-entry-page" class="max-w-4xl mx-auto">
+            <!-- 当天未填写仓库提示 -->
+            <div id="missingWarehousesAlert" class="hidden mt-4 max-w-2xl mx-auto bg-red-50 border-l-4 border-red-400 p-4 animate-fade-in">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="fa-solid fa-exclamation-triangle text-red-500"></i>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-red-800">需要注意</h3>
+                        <div class="mt-2 text-sm text-red-700">
+                            <p id="missingWarehousesList"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-custom p-6 mb-6 hover-scale animate-fade-in">
+                <h2 class="text-lg font-semibold text-neutral-dark mb-6 flex items-center">
+                    <i class="fa-solid fa-plus-circle text-primary mr-2"></i>
+                    新增仓库库存记录
+                </h2>
+                
+                <form id="warehouseForm" class="space-y-6">
+                    <!-- 仓库名称 -->
+                    <div>
+                        <label for="warehouseName" class="block text-sm font-medium text-gray-700 mb-2">仓库名称</label>
+                        <div class="relative">
+                            <select id="warehouseName" class="block w-full pl-3 pr-10 py-3 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-lg transition-custom">
+                                <option value="">请选择仓库</option>
+                                <!-- 仓库选项将通过JavaScript动态填充 -->
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                                <i class="fa-solid fa-chevron-down text-xs"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 最大库容量 -->
+                    <div>
+                        <label for="maxCapacity" class="block text-sm font-medium text-gray-700 mb-2">最大库容量（板）</label>
+                        <input type="number" id="maxCapacity" placeholder="请输入最大库容量" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-custom" min="0" step="1">
+                    </div>
+                    
+                    <!-- 目前库存数 -->
+                    <div>
+                        <label for="currentStock" class="block text-sm font-medium text-gray-700 mb-2">目前库存数（板）</label>
+                        <input type="number" id="currentStock" placeholder="请输入目前库存数" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-custom" min="0" step="1">
+                    </div>
+                    
+                    <div class="flex justify-center">
+                        <button type="button" id="submitButton" class="w-full md:w-auto px-8 py-3 bg-primary text-white rounded-lg font-medium shadow-md hover:bg-primary/90 transition-custom flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i class="fa-solid fa-save mr-2"></i>
+                            提交数据
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- 数据查看页面 -->
+        <section id="data-view-page" class="max-w-6xl mx-auto hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <!-- 数据操作 -->
+                <div class="bg-white rounded-xl shadow-custom p-6 hover-scale animate-fade-in">
+                    <h2 class="text-lg font-semibold text-neutral-dark mb-4 flex items-center">
+                        <i class="fa-solid fa-file-excel text-primary mr-2"></i>
+                        数据操作
+                    </h2>
+                    
+                    <div class="flex flex-col gap-4">
+                        <button id="downloadButton" class="px-4 py-3 bg-primary text-white rounded-lg font-medium shadow-md hover:bg-primary/90 transition-custom flex items-center justify-center">
+                            <i class="fa-solid fa-download mr-2"></i>
+                            下载Excel
+                        </button>
+                        <button id="clearButton" class="px-4 py-3 bg-gray-200 text-gray-800 rounded-lg font-medium shadow-md hover:bg-gray-300 transition-custom flex items-center justify-center">
+                            <i class="fa-solid fa-trash mr-2"></i>
+                            清空数据
+                        </button>
+                        <button id="manageWarehousesButton" class="px-4 py-3 bg-accent text-white rounded-lg font-medium shadow-md hover:bg-accent/90 transition-custom flex items-center justify-center">
+                            <i class="fa-solid fa-cog mr-2"></i>
+                            管理仓库
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 库存状态概览 -->
+                <div class="lg:col-span-2 bg-white rounded-xl shadow-custom p-6 hover-scale animate-fade-in">
+                    <h2 class="text-lg font-semibold text-neutral-dark mb-4 flex items-center">
+                        <i class="fa-solid fa-chart-pie text-primary mr-2"></i>
+                        库存状态概览
+                    </h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="w-full max-w-md h-64">
+                            <canvas id="inventoryChart"></canvas>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div class="p-3 bg-blue-50 rounded-lg">
+                                <p class="text-xs text-blue-600">总最大容量</p>
+                                <p id="totalCapacity" class="text-lg font-semibold text-blue-800">0 板</p>
+                            </div>
+                            <div class="p-3 bg-green-50 rounded-lg">
+                                <p class="text-xs text-green-600">总库存量</p>
+                                <p id="totalStock" class="text-lg font-semibold text-green-800">0 板</p>
+                            </div>
+                            <div class="p-3 bg-yellow-50 rounded-lg">
+                                <p class="text-xs text-yellow-600">平均使用率</p>
+                                <p id="averageUsage" class="text-lg font-semibold text-yellow-800">0%</p>
+                            </div>
+                            <div class="p-3 bg-red-50 rounded-lg">
+                                <p class="text-xs text-red-600">需要注意</p>
+                                <p id="warningCount" class="text-lg font-semibold text-red-800">0 个</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 仓库库存详情 -->
+            <div class="bg-white rounded-xl shadow-custom p-6 hover-scale animate-fade-in">
+                <h2 class="text-lg font-semibold text-neutral-dark mb-4 flex items-center">
+                    <i class="fa-solid fa-table text-primary mr-2"></i>
+                    仓库库存详情
+                </h2>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">仓库名称</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最大容量</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">当前库存</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">使用率</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最后更新</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                            </tr>
+                        </thead>
+                        <tbody id="warehouseTableBody" class="bg-white divide-y divide-gray-200">
+                            <!-- 数据将通过JavaScript动态填充 -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div id="noDataMessage" class="py-8 text-center hidden">
+                    <i class="fa-solid fa-box-open text-4xl text-gray-300 mb-4"></i>
+                    <p class="text-gray-500">暂无仓库库存数据</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 管理仓库模态框 -->
+    <div id="manageWarehousesModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] overflow-y-auto animate-fade-in">
+            <div class="p-6 border-b border-gray-200">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-semibold text-gray-900">管理仓库</h3>
+                    <button id="closeManageWarehousesModal" class="text-gray-500 hover:text-gray-700">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6">
+                <div class="mb-6">
+                    <h4 class="text-sm font-medium text-gray-700 mb-2">添加新仓库</h4>
+                    <div class="flex">
+                        <input type="text" id="newWarehouseName" placeholder="输入新仓库名称" class="flex-1 px-4 py-2 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-custom">
+                        <button id="addWarehouseButton" class="px-4 py-2 bg-primary text-white rounded-r-lg font-medium hover:bg-primary/90 transition-custom">
+                            添加
+                        </button>
+                    </div>
+                </div>
+                
+                <h4 class="text-sm font-medium text-gray-700 mb-3">现有仓库</h4>
+                <div id="warehouseList" class="space-y-2 max-h-[40vh] overflow-y-auto">
+                    <!-- 仓库列表将通过JavaScript动态填充 -->
+                </div>
+            </div>
+            <div class="p-6 border-t border-gray-200 flex justify-end">
+                <button id="closeManageWarehousesBtn" class="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300 transition-custom">
+                    关闭
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑仓库模态框 -->
+    <div id="editWarehouseModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md animate-fade-in">
+            <div class="p-6 border-b border-gray-200">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-semibold text-gray-900">编辑仓库</h3>
+                    <button id="closeEditWarehouseModal" class="text-gray-500 hover:text-gray-700">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6">
+                <input type="hidden" id="warehouseId">
+                <div class="mb-4">
+                    <label for="editWarehouseName" class="block text-sm font-medium text-gray-700 mb-2">仓库名称</label>
+                    <input type="text" id="editWarehouseName" placeholder="输入仓库名称" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-custom">
+                </div>
+            </div>
+            <div class="p-6 border-t border-gray-200 flex justify-end space-x-3">
+                <button id="deleteWarehouseButton" class="px-6 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-custom">
+                    删除
+                </button>
+                <button id="saveWarehouseButton" class="px-6 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-custom">
+                    保存
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-neutral-dark text-white py-6 mt-8">
+        <div class="container mx-auto px-4 text-center">
+            <p class="text-sm">© 2025 仓库库存数据管理系统. 保留所有权利.</p>
+        </div>
+    </footer>
+
+    <script>
+        // 全局变量
+        let warehouseData = [];
+        let warehouses = ['石排仓', '增城仓', '寮步仓'];
+        let inventoryChart = null;
+        const sheetName = '仓库库存数据';
+
+        // DOM 元素
+        const dataEntryPage = document.getElementById('data-entry-page');
+        const dataViewPage = document.getElementById('data-view-page');
+        const navDataEntry = document.getElementById('nav-data-entry');
+        const navDataView = document.getElementById('nav-data-view');
+        const mobileNavDataEntry = document.getElementById('mobile-nav-data-entry');
+        const mobileNavDataView = document.getElementById('mobile-nav-data-view');
+        const mobileMenuButton = document.getElementById('mobile-menu-button');
+        const mobileMenu = document.getElementById('mobile-menu');
+        const closeMobileMenu = document.getElementById('close-mobile-menu');
+        
+        const warehouseForm = document.getElementById('warehouseForm');
+        const warehouseName = document.getElementById('warehouseName');
+        const maxCapacity = document.getElementById('maxCapacity');
+        const currentStock = document.getElementById('currentStock');
+        const submitButton = document.getElementById('submitButton');
+        const downloadButton = document.getElementById('downloadButton');
+        const clearButton = document.getElementById('clearButton');
+        const manageWarehousesButton = document.getElementById('manageWarehousesButton');
+        
+        const notification = document.getElementById('notification');
+        const notificationMessage = document.getElementById('notification-message');
+        const notificationIcon = document.getElementById('notification-icon');
+        
+        const warehouseTableBody = document.getElementById('warehouseTableBody');
+        const noDataMessage = document.getElementById('noDataMessage');
+        const missingWarehousesAlert = document.getElementById('missingWarehousesAlert');
+        const missingWarehousesList = document.getElementById('missingWarehousesList');
+        
+        const totalCapacityEl = document.getElementById('totalCapacity');
+        const totalStockEl = document.getElementById('totalStock');
+        const averageUsageEl = document.getElementById('averageUsage');
+        const warningCountEl = document.getElementById('warningCount');
+        
+        const manageWarehousesModal = document.getElementById('manageWarehousesModal');
+        const closeManageWarehousesModal = document.getElementById('closeManageWarehousesModal');
+        const closeManageWarehousesBtn = document.getElementById('closeManageWarehousesBtn');
+        const newWarehouseName = document.getElementById('newWarehouseName');
+        const addWarehouseButton = document.getElementById('addWarehouseButton');
+        const warehouseList = document.getElementById('warehouseList');
+        
+        const editWarehouseModal = document.getElementById('editWarehouseModal');
+        const closeEditWarehouseModal = document.getElementById('closeEditWarehouseModal');
+        const warehouseId = document.getElementById('warehouseId');
+        const editWarehouseName = document.getElementById('editWarehouseName');
+        const deleteWarehouseButton = document.getElementById('deleteWarehouseButton');
+        const saveWarehouseButton = document.getElementById('saveWarehouseButton');
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('仓库库存数据管理系统已初始化');
+            
+            // 从本地存储加载数据
+            loadDataFromLocalStorage();
+            
+            // 初始化表单验证
+            initFormValidation();
+            
+            // 初始化页面导航
+            initNavigation();
+            
+            // 初始化仓库管理
+            initWarehouseManagement();
+            
+            // 按钮事件
+            submitButton.addEventListener('click', handleSubmit);
+            downloadButton.addEventListener('click', downloadExcel);
+            clearButton.addEventListener('click', clearData);
+            
+            // 更新UI
+            updateUI();
+            
+            // 检查当天未填写的仓库
+            checkMissingWarehouses();
+        });
+        
+        // 初始化页面导航
+        function initNavigation() {
+            // 导航链接点击事件
+            navDataEntry.addEventListener('click', () => showPage('data-entry'));
+            navDataView.addEventListener('click', () => showPage('data-view'));
+            mobileNavDataEntry.addEventListener('click', () => {
+                showPage('data-entry');
+                mobileMenu.style.transform = 'translateX(100%)';
+            });
+            mobileNavDataView.addEventListener('click', () => {
+                showPage('data-view');
+                mobileMenu.style.transform = 'translateX(100%)';
+            });
+            
+            // 移动菜单按钮
+            mobileMenuButton.addEventListener('click', () => {
+                mobileMenu.style.transform = 'translateX(0)';
+            });
+            
+            closeMobileMenu.addEventListener('click', () => {
+                mobileMenu.style.transform = 'translateX(100%)';
+            });
+            
+            // 检查URL哈希值，显示相应页面
+            const hash = window.location.hash.substr(1);
+            if (hash === 'data-view') {
+                showPage('data-view');
+            } else {
+                showPage('data-entry');
+            }
+        }
+        
+        // 显示指定页面
+        function showPage(page) {
+            if (page === 'data-entry') {
+                dataEntryPage.classList.remove('hidden');
+                dataViewPage.classList.add('hidden');
+                navDataEntry.classList.add('font-bold', 'border-b-2', 'border-white');
+                navDataView.classList.remove('font-bold', 'border-b-2', 'border-white');
+                mobileNavDataEntry.classList.add('active');
+                mobileNavDataView.classList.remove('active');
+                window.location.hash = 'data-entry';
+            } else if (page === 'data-view') {
+                dataEntryPage.classList.add('hidden');
+                dataViewPage.classList.remove('hidden');
+                navDataEntry.classList.remove('font-bold', 'border-b-2', 'border-white');
+                navDataView.classList.add('font-bold', 'border-b-2', 'border-white');
+                mobileNavDataEntry.classList.remove('active');
+                mobileNavDataView.classList.add('active');
+                window.location.hash = 'data-view';
+                updateUI(); // 确保数据视图页面更新
+            }
+        }
+        
+        // 初始化表单验证
+        function initFormValidation() {
+            // 监听表单输入变化，实时更新按钮状态
+            warehouseName.addEventListener('change', updateButtonState);
+            maxCapacity.addEventListener('input', updateButtonState);
+            currentStock.addEventListener('input', updateButtonState);
+        }
+        
+        // 更新按钮状态
+        function updateButtonState() {
+            if (warehouseName.value && maxCapacity.value !== '' && currentStock.value !== '' && 
+                !isNaN(parseFloat(maxCapacity.value)) && !isNaN(parseFloat(currentStock.value)) &&
+                parseFloat(maxCapacity.value) >= 0 && parseFloat(currentStock.value) >= 0) {
+                submitButton.removeAttribute('disabled');
+            } else {
+                submitButton.setAttribute('disabled', 'true');
+            }
+        }
+        
+        // 处理提交
+        function handleSubmit() {
+            // 验证表单
+            if (!validateForm()) {
+                return;
+            }
+            
+            // 创建新记录，精确到秒
+            const now = new Date();
+            const formattedDate = now.toISOString().replace('T', ' ').substring(0, 19);
+            
+            const newRecord = {
+                仓库名称: warehouseName.value,
+                最大库容量: parseFloat(maxCapacity.value),
+                目前库存数: parseFloat(currentStock.value),
+                日期: formattedDate
+            };
+            
+            // 添加到数据数组
+            warehouseData.push(newRecord);
+            
+            // 保存到本地存储
+            saveDataToLocalStorage();
+            
+            // 显示成功通知
+            showNotification(`已成功添加"${warehouseName.value}"的库存数据`, 'success');
+            
+            // 重置表单
+            resetForm();
+            
+            // 更新UI
+            updateUI();
+            
+            // 重新检查当天未填写的仓库
+            checkMissingWarehouses();
+            
+            console.log('新记录已添加:', newRecord);
+        }
+        
+        // 表单验证
+        function validateForm() {
+            if (!warehouseName.value) {
+                showNotification('请选择仓库名称', 'error');
+                return false;
+            }
+            
+            if (maxCapacity.value === '' || isNaN(parseFloat(maxCapacity.value)) || parseFloat(maxCapacity.value) < 0) {
+                showNotification('请输入有效的最大库容量', 'error');
+                return false;
+            }
+            
+            if (currentStock.value === '' || isNaN(parseFloat(currentStock.value)) || parseFloat(currentStock.value) < 0) {
+                showNotification('请输入有效的目前库存数', 'error');
+                return false;
+            }
+            
+            if (parseFloat(currentStock.value) > parseFloat(maxCapacity.value)) {
+                showNotification('目前库存数不能大于最大库容量', 'error');
+                return false;
+            }
+            
+            return true;
+        }
+        
+        // 重置表单
+        function resetForm() {
+            warehouseName.value = '';
+            maxCapacity.value = '';
+            currentStock.value = '';
+            updateButtonState();
+        }
+        
+        // 保存数据到本地存储
+        function saveDataToLocalStorage() {
+            localStorage.setItem('warehouseData', JSON.stringify(warehouseData));
+            localStorage.setItem('warehouses', JSON.stringify(warehouses));
+        }
+        
+        // 从本地存储加载数据
+        function loadDataFromLocalStorage() {
+            const savedData = localStorage.getItem('warehouseData');
+            if (savedData) {
+                warehouseData = JSON.parse(savedData);
+                console.log(`从本地存储加载了${warehouseData.length}条记录`);
+            }
+            
+            const savedWarehouses = localStorage.getItem('warehouses');
+            if (savedWarehouses) {
+                warehouses = JSON.parse(savedWarehouses);
+                console.log(`从本地存储加载了${warehouses.length}个仓库`);
+                updateWarehouseSelect();
+            }
+        }
+        
+        // 更新仓库选择下拉框
+        function updateWarehouseSelect() {
+            // 清空现有选项
+            warehouseName.innerHTML = '<option value="">请选择仓库</option>';
+            
+            // 添加仓库选项
+            warehouses.forEach(warehouse => {
+                const option = document.createElement('option');
+                option.value = warehouse;
+                option.textContent = warehouse;
+                warehouseName.appendChild(option);
+            });
+        }
+        
+        // 清空数据
+        function clearData() {
+            if (warehouseData.length === 0) {
+                showNotification('没有数据可清空', 'info');
+                return;
+            }
+            
+            if (confirm('确定要清空所有数据吗？此操作不可撤销。')) {
+                warehouseData = [];
+                saveDataToLocalStorage();
+                updateUI();
+                showNotification('所有数据已清空', 'info');
+            }
+        }
+        
+        // 更新UI
+        function updateUI() {
+            // 更新仓库表格
+            updateWarehouseTable();
+            
+            // 更新库存图表
+            updateInventoryChart();
+            
+            // 更新统计信息
+            updateStatistics();
+        }
+        
+        // 更新仓库表格
+        function updateWarehouseTable() {
+            if (warehouseData.length === 0) {
+                warehouseTableBody.innerHTML = '';
+                noDataMessage.classList.remove('hidden');
+                return;
+            }
+            
+            noDataMessage.classList.add('hidden');
+            
+            // 获取每个仓库的最新记录
+            const latestRecords = getLatestRecords();
+            
+            // 清空表格
+            warehouseTableBody.innerHTML = '';
+            
+            // 填充表格
+            latestRecords.forEach(record => {
+                const usageRate = (record.目前库存数 / record.最大库容量 * 100).toFixed(1);
+                let statusClass = 'bg-green-50 text-green-800';
+                let statusText = '充足';
+                
+                if (usageRate > 80) {
+                    statusClass = 'bg-yellow-50 text-yellow-800';
+                    statusText = '接近满仓';
+                }
+                
+                if (usageRate > 95) {
+                    statusClass = 'bg-red-50 text-red-800';
+                    statusText = '已满仓';
+                }
+                
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50 transition-custom';
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">${record.仓库名称}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-900">${record.最大库容量}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-900">${record.目前库存数}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div class="bg-primary h-2.5 rounded-full" style="width: ${usageRate}%"></div>
+                        </div>
+                        <div class="text-sm text-gray-500 mt-1">${usageRate}%</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${record.日期}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
+                            ${statusText}
+                        </span>
+                    </td>
+                `;
+                
+                warehouseTableBody.appendChild(row);
+            });
+        }
+        
+        // 获取每个仓库的最新记录
+        function getLatestRecords() {
+            const latestRecords = [];
+            const warehouseNames = [...new Set(warehouseData.map(record => record.仓库名称))];
+            
+            warehouseNames.forEach(name => {
+                // 按日期降序排序
+                const records = warehouseData
+                    .filter(record => record.仓库名称 === name)
+                    .sort((a, b) => new Date(b.日期) - new Date(a.日期));
+                
+                if (records.length > 0) {
+                    latestRecords.push(records[0]);
+                }
+            });
+            
+            return latestRecords;
+        }
+        
+        // 更新库存图表
+        function updateInventoryChart() {
+            // 获取每个仓库的最新记录
+            const latestRecords = getLatestRecords();
+            
+            if (latestRecords.length === 0) {
+                // 销毁现有图表
+                if (inventoryChart) {
+                    inventoryChart.destroy();
+                    inventoryChart = null;
+                }
+                return;
+            }
+            
+            // 准备图表数据
+            const labels = latestRecords.map(record => record.仓库名称);
+            const stockData = latestRecords.map(record => record.目前库存数);
+            const capacityData = latestRecords.map(record => record.最大库容量 - record.目前库存数);
+            
+            // 销毁现有图表
+            if (inventoryChart) {
+                inventoryChart.destroy();
+            }
+            
+            // 创建新图表
+            const ctx = document.getElementById('inventoryChart').getContext('2d');
+            inventoryChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '已使用',
+                        data: stockData,
+                        backgroundColor: [
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(16, 185, 129, 0.8)',
+                            'rgba(249, 115, 22, 0.8)',
+                            'rgba(139, 92, 246, 0.8)',
+                            'rgba(236, 72, 153, 0.8)'
+                        ],
+                        borderColor: [
+                            'rgba(59, 130, 246, 1)',
+                            'rgba(16, 185, 129, 1)',
+                            'rgba(249, 115, 22, 1)',
+                            'rgba(139, 92, 246, 1)',
+                            'rgba(236, 72, 153, 1)'
+                        ],
+                        borderWidth: 1
+                    }, {
+                        label: '可用',
+                        data: capacityData,
+                        backgroundColor: [
+                            'rgba(59, 130, 246, 0.3)',
+                            'rgba(16, 185, 129, 0.3)',
+                            'rgba(249, 115, 22, 0.3)',
+                            'rgba(139, 92, 246, 0.3)',
+                            'rgba(236, 72, 153, 0.3)'
+                        ],
+                        borderColor: [
+                            'rgba(59, 130, 246, 0.5)',
+                            'rgba(16, 185, 129, 0.5)',
+                            'rgba(249, 115, 22, 0.5)',
+                            'rgba(139, 92, 246, 0.5)',
+                            'rgba(236, 72, 153, 0.5)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 20,
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const datasetLabel = context.dataset.label || '';
+                                    
+                                    // 获取总容量
+                                    const index = context.dataIndex;
+                                    const totalCapacity = stockData[index] + capacityData[index];
+                                    
+                                    // 计算百分比
+                                    const percentage = ((value / totalCapacity) * 100).toFixed(1);
+                                    
+                                    return `${label} - ${datasetLabel}: ${value} 板 (${percentage}%)`;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '65%',
+                    animation: {
+                        animateScale: true,
+                        animateRotate: true
+                    }
+                }
+            });
+        }
+        
+        // 更新统计信息
+        function updateStatistics() {
+            // 获取每个仓库的最新记录
+            const latestRecords = getLatestRecords();
+            
+            if (latestRecords.length === 0) {
+                totalCapacityEl.textContent = '0 板';
+                totalStockEl.textContent = '0 板';
+                averageUsageEl.textContent = '0%';
+                warningCountEl.textContent = '0 个';
+                return;
+            }
+            
+            // 计算总容量
+            const totalCap = latestRecords.reduce((sum, record) => sum + record.最大库容量, 0);
+            
+            // 计算总库存
+            const totalStk = latestRecords.reduce((sum, record) => sum + record.目前库存数, 0);
+            
+            // 计算平均使用率
+            const avgUsage = (totalStk / totalCap * 100).toFixed(1);
+            
+            // 计算需要注意的仓库数量（使用率超过95%）
+            const warningCnt = latestRecords.filter(record => 
+                (record.目前库存数 / record.最大库容量) > 0.95
+            ).length;
+            
+            // 更新DOM
+            totalCapacityEl.textContent = `${totalCap} 板`;
+            totalStockEl.textContent = `${totalStk} 板`;
+            averageUsageEl.textContent = `${avgUsage}%`;
+            warningCountEl.textContent = `${warningCnt} 个`;
+        }
+        
+        // 检查当天未填写的仓库
+        function checkMissingWarehouses() {
+            const today = new Date().toISOString().split('T')[0];
+            
+            // 获取今天已经填写的仓库
+            const todayRecords = warehouseData.filter(record => 
+                record.日期.startsWith(today)
+            );
+            const todayWarehouses = todayRecords.map(record => record.仓库名称);
+            
+            // 找出未填写的仓库
+            const missingWarehouses = warehouses.filter(warehouse => !todayWarehouses.includes(warehouse));
+            
+            if (missingWarehouses.length > 0) {
+                // 显示警告
+                missingWarehousesAlert.classList.remove('hidden');
+                missingWarehousesList.textContent = `今天还未填写以下仓库的数据: ${missingWarehouses.join('、')}`;
+            } else {
+                // 隐藏警告
+                missingWarehousesAlert.classList.add('hidden');
+            }
+        }
+        
+        // 下载Excel文件
+        function downloadExcel() {
+            if (warehouseData.length === 0) {
+                showNotification('没有数据可导出', 'error');
+                return;
+            }
+            
+            showNotification('正在生成Excel文件...', 'info');
+            console.log('开始生成Excel文件');
+            
+            try {
+                // 创建工作簿
+                const wb = XLSX.utils.book_new();
+                
+                // 添加原始数据工作表
+                const wsData = XLSX.utils.json_to_sheet(warehouseData);
+                XLSX.utils.book_append_sheet(wb, wsData, sheetName);
+                
+                // 添加库存百分比饼图数据工作表
+                const latestRecords = getLatestRecords();
+                const pieChartData = latestRecords.map(record => ({
+                    '仓库名称': record.仓库名称,
+                    '最大库容量': record.最大库容量,
+                    '目前库存数': record.目前库存数,
+                    '使用率(%)': ((record.目前库存数 / record.最大库容量) * 100).toFixed(1),
+                    '最后更新时间': record.日期
+                }));
+                
+                const wsChart = XLSX.utils.json_to_sheet(pieChartData);
+                XLSX.utils.book_append_sheet(wb, wsChart, '库存百分比');
+                
+                // 生成Excel文件并下载
+                XLSX.writeFile(wb, `仓库库存数据_${new Date().toISOString().split('T')[0].replace(/-/g, '')}.xlsx`);
+                
+                showNotification('Excel文件已生成并下载', 'success');
+                console.log('Excel文件生成并下载成功');
+            } catch (error) {
+                showNotification('生成Excel文件时出错: ' + error.message, 'error');
+                console.error('生成Excel文件时出错:', error);
+            }
+        }
+        
+        // 显示通知
+        function showNotification(message, type) {
+            notificationMessage.textContent = message;
+            
+            // 设置图标和样式
+            if (type === 'success') {
+                notificationIcon.className = 'fa-solid fa-check-circle text-green-500';
+                notification.className = 'fixed top-4 right-4 p-4 rounded-lg shadow-lg transform transition-all duration-300 bg-green-50 text-green-800 border-l-4 border-green-400 z-50 flex items-center';
+            } else if (type === 'error') {
+                notificationIcon.className = 'fa-solid fa-exclamation-circle text-red-500';
+                notification.className = 'fixed top-4 right-4 p-4 rounded-lg shadow-lg transform transition-all duration-300 bg-red-50 text-red-800 border-l-4 border-red-400 z-50 flex items-center';
+            } else if (type === 'warning') {
+                notificationIcon.className = 'fa-solid fa-exclamation-triangle text-yellow-500';
+                notification.className = 'fixed top-4 right-4 p-4 rounded-lg shadow-lg transform transition-all duration-300 bg-yellow-50 text-yellow-800 border-l-4 border-yellow-400 z-50 flex items-center';
+            } else if (type === 'info') {
+                notificationIcon.className = 'fa-solid fa-info-circle text-blue-500';
+                notification.className = 'fixed top-4 right-4 p-4 rounded-lg shadow-lg transform transition-all duration-300 bg-blue-50 text-blue-800 border-l-4 border-blue-400 z-50 flex items-center';
+            }
+            
+            // 显示通知
+            notification.style.transform = 'translateY(0)';
+            notification.style.opacity = '1';
+            
+            // 3秒后隐藏通知
+            setTimeout(() => {
+                notification.style.transform = 'translateY(-100px)';
+                notification.style.opacity = '0';
+            }, 3000);
+        }
+        
+        // 初始化仓库管理
+        function initWarehouseManagement() {
+            // 打开仓库管理模态框
+            manageWarehousesButton.addEventListener('click', () => {
+                renderWarehouseList();
+                manageWarehousesModal.classList.remove('hidden');
+            });
+            
+            // 关闭仓库管理模态框
+            closeManageWarehousesModal.addEventListener('click', () => {
+                manageWarehousesModal.classList.add('hidden');
+            });
+            
+            closeManageWarehousesBtn.addEventListener('click', () => {
+                manageWarehousesModal.classList.add('hidden');
+            });
+            
+            // 添加新仓库
+            addWarehouseButton.addEventListener('click', () => {
+                const name = newWarehouseName.value.trim();
+                if (!name) {
+                    showNotification('请输入仓库名称', 'error');
+                    return;
+                }
+                
+                if (warehouses.includes(name)) {
+                    showNotification('该仓库名称已存在', 'error');
+                    return;
+                }
+                
+                warehouses.push(name);
+                saveDataToLocalStorage();
+                updateWarehouseSelect();
+                renderWarehouseList();
+                newWarehouseName.value = '';
+                showNotification(`已添加仓库"${name}"`, 'success');
+            });
+            
+            // 关闭编辑仓库模态框
+            closeEditWarehouseModal.addEventListener('click', () => {
+                editWarehouseModal.classList.add('hidden');
+            });
+            
+            // 删除仓库
+            deleteWarehouseButton.addEventListener('click', () => {
+                const id = warehouseId.value;
+                const name = editWarehouseName.value;
+                
+                if (confirm(`确定要删除仓库"${name}"吗？此操作将删除所有与该仓库相关的数据。`)) {
+                    // 从仓库列表中删除
+                    warehouses = warehouses.filter(warehouse => warehouse !== name);
+                    
+                    // 删除相关数据
+                    warehouseData = warehouseData.filter(record => record.仓库名称 !== name);
+                    
+                    // 保存更改
+                    saveDataToLocalStorage();
+                    updateWarehouseSelect();
+                    updateUI();
+                    
+                    // 关闭模态框
+                    editWarehouseModal.classList.add('hidden');
+                    renderWarehouseList();
+                    
+                    showNotification(`已删除仓库"${name}"`, 'info');
+                }
+            });
+            
+            // 保存仓库更改
+            saveWarehouseButton.addEventListener('click', () => {
+                const id = warehouseId.value;
+                const oldName = warehouses[id];
+                const newName = editWarehouseName.value.trim();
+                
+                if (!newName) {
+                    showNotification('请输入仓库名称', 'error');
+                    return;
+                }
+                
+                if (newName !== oldName && warehouses.includes(newName)) {
+                    showNotification('该仓库名称已存在', 'error');
+                    return;
+                }
+                
+                // 更新仓库名称
+                warehouses[id] = newName;
+                
+                // 更新相关数据
+                warehouseData.forEach(record => {
+                    if (record.仓库名称 === oldName) {
+                        record.仓库名称 = newName;
+                    }
+                });
+                
+                // 保存更改
+                saveDataToLocalStorage();
+                updateWarehouseSelect();
+                updateUI();
+                
+                // 关闭模态框
+                editWarehouseModal.classList.add('hidden');
+                renderWarehouseList();
+                
+                showNotification(`已更新仓库名称为"${newName}"`, 'success');
+            });
+        }
+        
+        // 渲染仓库列表
+        function renderWarehouseList() {
+            warehouseList.innerHTML = '';
+            
+            if (warehouses.length === 0) {
+                warehouseList.innerHTML = '<p class="text-gray-500 italic">没有仓库，请添加新仓库。</p>';
+                return;
+            }
+            
+            warehouses.forEach((warehouse, index) => {
+                const item = document.createElement('div');
+                item.className = 'flex justify-between items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-custom';
+                item.innerHTML = `
+                    <span class="font-medium">${warehouse}</span>
+                    <div class="flex space-x-2">
+                        <button class="edit-warehouse-btn p-1.5 text-gray-600 hover:text-primary transition-custom" data-index="${index}">
+                            <i class="fa-solid fa-pencil"></i>
+                        </button>
+                    </div>
+                `;
+                
+                // 添加编辑按钮事件
+                const editBtn = item.querySelector('.edit-warehouse-btn');
+                editBtn.addEventListener('click', () => {
+                    warehouseId.value = index;
+                    editWarehouseName.value = warehouse;
+                    editWarehouseModal.classList.remove('hidden');
+                });
+                
+                warehouseList.appendChild(item);
+            });
+        }
+    </script>
+</body>
+</html>
+    
