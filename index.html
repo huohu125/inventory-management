@@ -375,7 +375,7 @@
         // 模拟用户数据
         const users = {
             'admin': 'admin123',
-            'ssc': 'ssc123'
+            'user': 'user123'
         };
         let currentUser = null;
 
@@ -504,15 +504,16 @@
                 }
             });
             
-            // 退出登录按钮 - 使用事件委托
-            document.body.addEventListener('click', function(e) {
-                if (e.target.id === 'logout-button' || e.target.closest('#logout-button')) {
-                    logout();
-                }
-                if (e.target.id === 'mobile-logout-button' || e.target.closest('#mobile-logout-button')) {
-                    logout();
-                }
-            });
+            // 确保事件监听器只被添加一次
+            if (!logoutButton.hasOwnProperty('initialized')) {
+                logoutButton.addEventListener('click', logout);
+                logoutButton.initialized = true;
+            }
+            
+            if (!mobileLogoutButton.hasOwnProperty('initialized')) {
+                mobileLogoutButton.addEventListener('click', logout);
+                mobileLogoutButton.initialized = true;
+            }
             
             // 登录按钮事件
             loginButton.addEventListener('click', login);
@@ -567,66 +568,27 @@
             }
         }
         
-        // 退出登录 - 彻底重构版本
+        // 退出登录
         function logout() {
-            console.log('退出登录流程开始');
-            
-            // 确认对话框
-            if (confirm('确定要退出登录吗？')) {
-                console.log('用户确认退出登录');
-                
-                // 使用命名函数确保执行顺序
-                clearUserSession();
-                updateUserInterface();
-                showLogoutNotification();
-                logLogoutTime();
-                
-                console.log('退出登录流程完成');
-            } else {
-                console.log('用户取消退出登录');
+            // 修复：确保在调用logout时按钮已经存在
+            if (!logoutButton || !mobileLogoutButton) {
+                console.error('Logout buttons not initialized');
+                return;
             }
-        }
-        
-        // 清除用户会话
-        function clearUserSession() {
-            console.log('清除用户会话');
-            currentUser = null;
-            localStorage.removeItem('currentUser');
-        }
-        
-        // 更新用户界面
-        function updateUserInterface() {
-            console.log('更新用户界面');
             
-            // 隐藏登录相关UI
-            userInfo.classList.add('hidden');
-            logoutButton.classList.add('hidden');
-            mobileUserInfo.classList.add('hidden');
-            mobileLogoutButton.classList.add('hidden');
-            
-            // 切换到数据录入页面
-            showPage('data-entry');
-            
-            // 确保移动菜单已关闭
-            mobileMenu.style.transform = 'translateX(100%)';
-        }
-        
-        // 显示退出通知
-        function showLogoutNotification() {
-            console.log('显示退出通知');
-            showNotification('已成功退出登录', 'info');
-        }
-        
-        // 记录登出时间
-        function logLogoutTime() {
-            const logoutTime = new Date().toISOString();
-            console.log(`用户登出时间: ${logoutTime}`);
+            if (confirm('确定要退出登录吗？')) {
+                currentUser = null;
+                localStorage.removeItem('currentUser');
+                updateUserDisplay();
+                showNotification('已成功退出登录', 'info');
+                
+                // 确保无论当前在哪个页面，都会切换到数据录入页面
+                showPage('data-entry');
+            }
         }
         
         // 更新用户显示
         function updateUserDisplay() {
-            console.log('更新用户显示:', currentUser);
-            
             if (isLoggedIn()) {
                 userInfo.textContent = `欢迎，${currentUser}`;
                 userInfo.classList.remove('hidden');
