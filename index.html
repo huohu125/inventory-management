@@ -447,8 +447,8 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('仓库库存数据管理系统已初始化');
             
-            // 从本地存储加载数据
-            loadDataFromLocalStorage();
+            // 从Firebase加载数据
+            loadDataFromFirebase();
             
             // 初始化表单验证
             initFormValidation();
@@ -703,11 +703,11 @@
                 日期: formattedDate
             };
             
-            // 添加到数据数组
-            warehouseData.push(newRecord);
+            // 将数据保存到Firebase
+            saveDataToFirebase(newRecord);
             
-            // 保存到本地存储
-            saveDataToLocalStorage();
+            // 添加到本地数据数组
+            warehouseData.push(newRecord);
             
             // 显示成功通知
             showNotification(`已成功添加"${warehouseName.value}"的库存数据`, 'success');
@@ -753,3 +753,81 @@
         function resetForm() {
             warehouseName.value = '';
             maxCapacity.value = '';
+            currentStock.value = '';
+            updateButtonState();
+        }
+        
+        // 显示通知
+        function showNotification(message, type) {
+            notificationMessage.textContent = message;
+            
+            // 设置通知样式
+            if (type === 'success') {
+                notification.className = 'fixed top-4 right-4 p-4 rounded-lg shadow-lg transform transition-all duration-300 translate-y-0 opacity-100 z-50 flex items-center bg-green-500 text-white';
+                notificationIcon.className = 'fa-solid fa-check-circle mr-2 text-xl';
+            } else if (type === 'error') {
+                notification.className = 'fixed top-4 right-4 p-4 rounded-lg shadow-lg transform transition-all duration-300 translate-y-0 opacity-100 z-50 flex items-center bg-red-500 text-white';
+                notificationIcon.className = 'fa-solid fa-exclamation-circle mr-2 text-xl';
+            } else if (type === 'info') {
+                notification.className = 'fixed top-4 right-4 p-4 rounded-lg shadow-lg transform transition-all duration-300 translate-y-0 opacity-100 z-50 flex items-center bg-blue-500 text-white';
+                notificationIcon.className = 'fa-solid fa-info-circle mr-2 text-xl';
+            }
+            
+            // 显示通知
+            notification.style.display = 'flex';
+            
+            // 3秒后隐藏通知
+            setTimeout(() => {
+                notification.style.transform = 'translateY(-100px)';
+                notification.style.opacity = '0';
+                setTimeout(() => {
+                    notification.style.display = 'none';
+                }, 300);
+            }, 3000);
+        }
+        
+        // 从Firebase加载数据
+        function loadDataFromFirebase() {
+            // 获取Firebase数据库引用
+            const dbRef = firebase.database().ref('warehouseData');
+            
+            // 监听数据变化
+            dbRef.on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    // 将对象转换为数组
+                    warehouseData = Object.values(data);
+                } else {
+                    warehouseData = [];
+                }
+                
+                // 更新UI
+                updateUI();
+                console.log('数据已从Firebase加载');
+            }, (error) => {
+                console.error('从Firebase加载数据时出错:', error);
+                showNotification('加载数据失败，请稍后重试', 'error');
+                
+                // 从本地存储加载备份数据
+                loadDataFromLocalStorage();
+            });
+        }
+        
+        // 将数据保存到Firebase
+        function saveDataToFirebase(record) {
+            // 获取Firebase数据库引用
+            const dbRef = firebase.database().ref('warehouseData');
+            
+            // 生成唯一ID
+            const newRecordRef = dbRef.push();
+            
+            // 保存数据
+            newRecordRef.set(record)
+                .then(() => {
+                    console.log('数据已保存到Firebase');
+                    
+                    // 也保存到本地存储作为备份
+                    saveDataToLocalStorage();
+                })
+                .catch((error) => {
+                    console
