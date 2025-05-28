@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Firebase 实时数据库测试</title>
+  <!-- 引入 Firebase 库 -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"></script>
+</head>
+<body>
+  <h1>Firebase 实时数据库测试</h1>
+  <button id="writeData">写入数据</button>
+  <button id="readData">读取数据</button>
+  <div id="output"></div>
+
+  <script>
+    // 配置信息（从你的 firebase.js 复制）
+    const firebaseConfig = {
+      apiKey: "AIzaSyB26UN0xUbXuNwT92c24rpqdQgTb6mgZT0",
+      authDomain: "cangkuguanli-57be3.firebaseapp.com",
+      databaseURL: "https://cangkuguanli-57be3.firebaseio.com",
+      projectId: "cangkuguanli-57be3",
+      storageBucket: "cangkuguanli-57be3.firebasestorage.app",
+      messagingSenderId: "680909943577",
+      appId: "1:680909943577:web:60d83cee9f59f229a10b88",
+      measurementId: "G-VW9M3F87XQ"
+    };
+
+    // 初始化 Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    // 获取 DOM 元素
+    const writeBtn = document.getElementById('writeData');
+    const readBtn = document.getElementById('readData');
+    const outputDiv = document.getElementById('output');
+
+    // 写入测试数据
+    writeBtn.addEventListener('click', () => {
+      const testData = {
+        message: "测试成功！",
+        timestamp: new Date().toISOString()
+      };
+
+      database.ref('test-data').set(testData)
+        .then(() => {
+          outputDiv.innerHTML = '<p class="text-green-600">数据写入成功！</p>';
+          console.log('数据写入成功');
+        })
+        .catch((error) => {
+          outputDiv.innerHTML = `<p class="text-red-600">写入失败：${error.message}</p>`;
+          console.error('写入失败:', error);
+        });
+    });
+
+    // 读取测试数据
+    readBtn.addEventListener('click', () => {
+      database.ref('test-data').once('value')
+        .then((snapshot) => {
+          const data = snapshot.val();
+          if (data) {
+            outputDiv.innerHTML = `<p>读取成功：${JSON.stringify(data)}</p>`;
+            console.log('读取成功:', data);
+          } else {
+            outputDiv.innerHTML = '<p class="text-yellow-600">没有找到数据，请先写入</p>';
+            console.log('没有找到数据');
+          }
+        })
+        .catch((error) => {
+          outputDiv.innerHTML = `<p class="text-red-600">读取失败：${error.message}</p>`;
+          console.error('读取失败:', error);
+        });
+    });
+  </script>
+</body>
+</html>
