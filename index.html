@@ -1,14 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>仓库库存数据管理系统</title>
-    <!-- 引入 Firebase 官方库 -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"></script>
-    <!-- 引入你写的 firebase.js（注意路径是否正确） -->
-    <script src="src/firebase.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -447,8 +443,8 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('仓库库存数据管理系统已初始化');
             
-            // 从Firebase加载数据
-            loadDataFromFirebase();
+            // 从本地存储加载数据
+            loadDataFromLocalStorage();
             
             // 初始化表单验证
             initFormValidation();
@@ -703,11 +699,11 @@
                 日期: formattedDate
             };
             
-            // 将数据保存到Firebase
-            saveDataToFirebase(newRecord);
-            
-            // 添加到本地数据数组
+            // 添加到数据数组
             warehouseData.push(newRecord);
+            
+            // 保存到本地存储
+            saveDataToLocalStorage();
             
             // 显示成功通知
             showNotification(`已成功添加"${warehouseName.value}"的库存数据`, 'success');
@@ -757,77 +753,540 @@
             updateButtonState();
         }
         
+        // 保存数据到本地存储
+        function saveDataToLocalStorage() {
+            localStorage.setItem('warehouseData', JSON.stringify(warehouseData));
+            localStorage.setItem('warehouses', JSON.stringify(warehouses));
+        }
+        
+        // 从本地存储加载数据
+        function loadDataFromLocalStorage() {
+            const savedData = localStorage.getItem('warehouseData');
+            if (savedData) {
+                warehouseData = JSON.parse(savedData);
+                console.log(`从本地存储加载了${warehouseData.length}条记录`);
+            }
+            
+            const savedWarehouses = localStorage.getItem('warehouses');
+            if (savedWarehouses) {
+                warehouses = JSON.parse(savedWarehouses);
+                console.log(`从本地存储加载了${warehouses.length}个仓库`);
+                updateWarehouseSelect();
+            }
+        }
+        
+        // 更新仓库选择下拉框
+        function updateWarehouseSelect() {
+            // 清空现有选项
+            warehouseName.innerHTML = '<option value="">请选择仓库</option>';
+            
+            // 添加仓库选项
+            warehouses.forEach(warehouse => {
+                const option = document.createElement('option');
+                option.value = warehouse;
+                option.textContent = warehouse;
+                warehouseName.appendChild(option);
+            });
+        }
+        
+        // 清空数据
+        function clearData() {
+            if (warehouseData.length === 0) {
+                showNotification('没有数据可清空', 'info');
+                return;
+            }
+            
+            if (confirm('确定要清空所有数据吗？此操作不可撤销。')) {
+                warehouseData = [];
+                saveDataToLocalStorage();
+                updateUI();
+                showNotification('所有数据已清空', 'info');
+            }
+        }
+        
+        // 更新UI
+        function updateUI() {
+            // 更新仓库表格
+            updateWarehouseTable();
+            
+            // 更新库存图表
+            updateInventoryChart();
+            
+            // 更新统计信息
+            updateStatistics();
+        }
+        
+        // 更新仓库表格
+        function updateWarehouseTable() {
+            if (warehouseData.length === 0) {
+                warehouseTableBody.innerHTML = '';
+                noDataMessage.classList.remove('hidden');
+                return;
+            }
+            
+            noDataMessage.classList.add('hidden');
+            
+            // 获取每个仓库的最新记录
+            const latestRecords = getLatestRecords();
+            
+            // 清空表格
+            warehouseTableBody.innerHTML = '';
+            
+            // 填充表格
+            latestRecords.forEach(record => {
+                const usageRate = (record.目前库存数 / record.最大库容量 * 100).toFixed(1);
+                let statusClass = 'bg-green-50 text-green-800';
+                let statusText = '充足';
+                
+                if (usageRate > 80) {
+                    statusClass = 'bg-yellow-50 text-yellow-800';
+                    statusText = '接近满仓';
+                }
+                
+                if (usageRate > 95) {
+                    statusClass = 'bg-red-50 text-red-800';
+                    statusText = '已满仓';
+                }
+                
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50 transition-custom';
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">${record.仓库名称}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-900">${record.最大库容量}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-900">${record.目前库存数}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div class="bg-primary h-2.5 rounded-full" style="width: ${usageRate}%"></div>
+                        </div>
+                        <div class="text-sm text-gray-500 mt-1">${usageRate}%</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${record.日期}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
+                            ${statusText}
+                        </span>
+                    </td>
+                `;
+                
+                warehouseTableBody.appendChild(row);
+            });
+        }
+        
+        // 获取每个仓库的最新记录
+        function getLatestRecords() {
+            const latestRecords = [];
+            const warehouseNames = [...new Set(warehouseData.map(record => record.仓库名称))];
+            
+            warehouseNames.forEach(name => {
+                // 按日期降序排序
+                const records = warehouseData
+                    .filter(record => record.仓库名称 === name)
+                    .sort((a, b) => new Date(b.日期) - new Date(a.日期));
+                
+                if (records.length > 0) {
+                    latestRecords.push(records[0]);
+                }
+            });
+            
+            return latestRecords;
+        }
+        
+        // 更新库存图表
+        function updateInventoryChart() {
+            // 获取每个仓库的最新记录
+            const latestRecords = getLatestRecords();
+            
+            if (latestRecords.length === 0) {
+                // 销毁现有图表
+                if (inventoryChart) {
+                    inventoryChart.destroy();
+                    inventoryChart = null;
+                }
+                return;
+            }
+            
+            // 准备图表数据
+            const labels = latestRecords.map(record => record.仓库名称);
+            const stockData = latestRecords.map(record => record.目前库存数);
+            const capacityData = latestRecords.map(record => record.最大库容量 - record.目前库存数);
+            
+            // 销毁现有图表
+            if (inventoryChart) {
+                inventoryChart.destroy();
+            }
+            
+            // 创建新图表
+            const ctx = document.getElementById('inventoryChart').getContext('2d');
+            inventoryChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '已使用',
+                        data: stockData,
+                        backgroundColor: [
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(16, 185, 129, 0.8)',
+                            'rgba(249, 115, 22, 0.8)',
+                            'rgba(139, 92, 246, 0.8)',
+                            'rgba(236, 72, 153, 0.8)'
+                        ],
+                        borderColor: [
+                            'rgba(59, 130, 246, 1)',
+                            'rgba(16, 185, 129, 1)',
+                            'rgba(249, 115, 22, 1)',
+                            'rgba(139, 92, 246, 1)',
+                            'rgba(236, 72, 153, 1)'
+                        ],
+                        borderWidth: 1
+                    }, {
+                        label: '可用',
+                        data: capacityData,
+                        backgroundColor: [
+                            'rgba(59, 130, 246, 0.3)',
+                            'rgba(16, 185, 129, 0.3)',
+                            'rgba(249, 115, 22, 0.3)',
+                            'rgba(139, 92, 246, 0.3)',
+                            'rgba(236, 72, 153, 0.3)'
+                        ],
+                        borderColor: [
+                            'rgba(59, 130, 246, 0.5)',
+                            'rgba(16, 185, 129, 0.5)',
+                            'rgba(249, 115, 22, 0.5)',
+                            'rgba(139, 92, 246, 0.5)',
+                            'rgba(236, 72, 153, 0.5)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 20,
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `${label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '65%'
+                }
+            });
+        }
+        
+        // 更新统计信息
+        function updateStatistics() {
+            const latestRecords = getLatestRecords();
+            
+            if (latestRecords.length === 0) {
+                totalCapacityEl.textContent = '0 板';
+                totalStockEl.textContent = '0 板';
+                averageUsageEl.textContent = '0%';
+                warningCountEl.textContent = '0 个';
+                return;
+            }
+            
+            // 计算总最大容量
+            const totalCapacity = latestRecords.reduce((sum, record) => sum + record.最大库容量, 0);
+            
+            // 计算总库存量
+            const totalStock = latestRecords.reduce((sum, record) => sum + record.目前库存数, 0);
+            
+            // 计算平均使用率
+            const averageUsage = (totalStock / totalCapacity * 100).toFixed(1);
+            
+            // 计算需要注意的仓库数量（使用率超过80%）
+            const warningCount = latestRecords.filter(record => 
+                (record.目前库存数 / record.最大库容量 * 100) > 80
+            ).length;
+            
+            // 更新DOM
+            totalCapacityEl.textContent = `${totalCapacity.toLocaleString()} 板`;
+            totalStockEl.textContent = `${totalStock.toLocaleString()} 板`;
+            averageUsageEl.textContent = `${averageUsage}%`;
+            warningCountEl.textContent = `${warningCount} 个`;
+        }
+        
+        // 下载Excel
+        function downloadExcel() {
+            if (warehouseData.length === 0) {
+                showNotification('没有数据可导出', 'info');
+                return;
+            }
+            
+            // 创建工作簿
+            const wb = XLSX.utils.book_new();
+            
+            // 转换数据为工作表
+            const ws = XLSX.utils.json_to_sheet(warehouseData);
+            
+            // 添加工作表到工作簿
+            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+            
+            // 生成文件名
+            const today = new Date();
+            const dateString = today.toISOString().split('T')[0];
+            const fileName = `仓库库存数据_${dateString}.xlsx`;
+            
+            // 下载文件
+            XLSX.writeFile(wb, fileName);
+            
+            showNotification('数据已成功导出为Excel文件', 'success');
+        }
+        
+        // 检查当天未填写的仓库
+        function checkMissingWarehouses() {
+            if (!isLoggedIn()) return;
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            // 获取今天的所有记录
+            const todayRecords = warehouseData.filter(record => {
+                const recordDate = new Date(record.日期);
+                recordDate.setHours(0, 0, 0, 0);
+                return recordDate.getTime() === today.getTime();
+            });
+            
+            // 获取今天有记录的仓库名称
+            const recordedWarehouses = new Set(todayRecords.map(record => record.仓库名称));
+            
+            // 找出今天没有记录的仓库
+            const missingWarehouses = warehouses.filter(warehouse => !recordedWarehouses.has(warehouse));
+            
+            // 显示或隐藏警告
+            if (missingWarehouses.length > 0) {
+                missingWarehousesAlert.classList.remove('hidden');
+                missingWarehousesList.textContent = `今天尚未填写以下仓库的数据: ${missingWarehouses.join('、')}`;
+            } else {
+                missingWarehousesAlert.classList.add('hidden');
+            }
+        }
+        
+        // 初始化仓库管理
+        function initWarehouseManagement() {
+            // 打开管理仓库模态框
+            manageWarehousesButton.addEventListener('click', function() {
+                updateWarehouseList();
+                manageWarehousesModal.classList.remove('hidden');
+                newWarehouseName.focus();
+            });
+            
+            // 关闭管理仓库模态框
+            closeManageWarehousesModal.addEventListener('click', function() {
+                manageWarehousesModal.classList.add('hidden');
+            });
+            
+            closeManageWarehousesBtn.addEventListener('click', function() {
+                manageWarehousesModal.classList.add('hidden');
+            });
+            
+            // 添加新仓库
+            addWarehouseButton.addEventListener('click', function() {
+                const name = newWarehouseName.value.trim();
+                
+                if (!name) {
+                    showNotification('请输入仓库名称', 'error');
+                    return;
+                }
+                
+                if (warehouses.includes(name)) {
+                    showNotification('该仓库已存在', 'error');
+                    return;
+                }
+                
+                // 添加新仓库
+                warehouses.push(name);
+                
+                // 保存到本地存储
+                saveDataToLocalStorage();
+                
+                // 更新UI
+                updateWarehouseList();
+                updateWarehouseSelect();
+                
+                // 清空输入框
+                newWarehouseName.value = '';
+                
+                showNotification(`已添加新仓库"${name}"`, 'success');
+            });
+            
+            // 关闭编辑仓库模态框
+            closeEditWarehouseModal.addEventListener('click', function() {
+                editWarehouseModal.classList.add('hidden');
+            });
+            
+            // 删除仓库
+            deleteWarehouseButton.addEventListener('click', function() {
+                const id = warehouseId.value;
+                const name = editWarehouseName.value.trim();
+                
+                if (!id || !name) {
+                    showNotification('无效的仓库信息', 'error');
+                    editWarehouseModal.classList.add('hidden');
+                    return;
+                }
+                
+                if (confirm(`确定要删除仓库"${name}"吗？相关的库存数据也将被删除。`)) {
+                    // 从仓库列表中删除
+                    warehouses = warehouses.filter(warehouse => warehouse !== name);
+                    
+                    // 删除相关数据
+                    warehouseData = warehouseData.filter(record => record.仓库名称 !== name);
+                    
+                    // 保存到本地存储
+                    saveDataToLocalStorage();
+                    
+                    // 更新UI
+                    updateWarehouseList();
+                    updateWarehouseSelect();
+                    updateUI();
+                    
+                    // 关闭模态框
+                    editWarehouseModal.classList.add('hidden');
+                    
+                    showNotification(`已删除仓库"${name}"`, 'info');
+                }
+            });
+            
+            // 保存仓库
+            saveWarehouseButton.addEventListener('click', function() {
+                const id = warehouseId.value;
+                const oldName = warehouses[id];
+                const newName = editWarehouseName.value.trim();
+                
+                if (!id || !oldName || !newName) {
+                    showNotification('无效的仓库信息', 'error');
+                    editWarehouseModal.classList.add('hidden');
+                    return;
+                }
+                
+                if (newName === oldName) {
+                    showNotification('名称未更改', 'info');
+                    editWarehouseModal.classList.add('hidden');
+                    return;
+                }
+                
+                if (warehouses.includes(newName)) {
+                    showNotification('该仓库名称已存在', 'error');
+                    return;
+                }
+                
+                // 更新仓库名称
+                warehouses[id] = newName;
+                
+                // 更新相关数据
+                warehouseData.forEach(record => {
+                    if (record.仓库名称 === oldName) {
+                        record.仓库名称 = newName;
+                    }
+                });
+                
+                // 保存到本地存储
+                saveDataToLocalStorage();
+                
+                // 更新UI
+                updateWarehouseList();
+                updateWarehouseSelect();
+                updateUI();
+                
+                // 关闭模态框
+                editWarehouseModal.classList.add('hidden');
+                
+                showNotification(`已将仓库"${oldName}"重命名为"${newName}"`, 'success');
+            });
+        }
+        
+        // 更新仓库列表
+        function updateWarehouseList() {
+            // 清空现有列表
+            warehouseList.innerHTML = '';
+            
+            // 添加仓库到列表
+            warehouses.forEach((warehouse, index) => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-custom';
+                item.innerHTML = `
+                    <div class="flex items-center">
+                        <i class="fa-solid fa-warehouse text-primary mr-3"></i>
+                        <span>${warehouse}</span>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button class="edit-warehouse-btn p-1.5 text-blue-600 hover:bg-blue-100 rounded" data-index="${index}">
+                            <i class="fa-solid fa-pencil-alt"></i>
+                        </button>
+                    </div>
+                `;
+                
+                // 添加编辑按钮事件
+                const editBtn = item.querySelector('.edit-warehouse-btn');
+                editBtn.addEventListener('click', function() {
+                    warehouseId.value = index;
+                    editWarehouseName.value = warehouse;
+                    editWarehouseModal.classList.remove('hidden');
+                    editWarehouseName.focus();
+                });
+                
+                warehouseList.appendChild(item);
+            });
+        }
+        
         // 显示通知
         function showNotification(message, type) {
             notificationMessage.textContent = message;
             
-            // 设置通知样式
+            // 设置图标和样式
             if (type === 'success') {
-                notification.className = 'fixed top-4 right-4 p-4 rounded-lg shadow-lg transform transition-all duration-300 translate-y-0 opacity-100 z-50 flex items-center bg-green-500 text-white';
-                notificationIcon.className = 'fa-solid fa-check-circle mr-2 text-xl';
+                notificationIcon.className = 'fa-solid fa-check-circle text-green-500';
+                notification.className = 'fixed top-4 right-4 p-4 rounded-lg shadow-lg transform transition-all duration-300 bg-green-50 text-green-800 border-l-4 border-green-400 z-50 flex items-center';
             } else if (type === 'error') {
-                notification.className = 'fixed top-4 right-4 p-4 rounded-lg shadow-lg transform transition-all duration-300 translate-y-0 opacity-100 z-50 flex items-center bg-red-500 text-white';
-                notificationIcon.className = 'fa-solid fa-exclamation-circle mr-2 text-xl';
+                notificationIcon.className = 'fa-solid fa-exclamation-circle text-red-500';
+                notification.className = 'fixed top-4 right-4 p-4 rounded-lg shadow-lg transform transition-all duration-300 bg-red-50 text-red-800 border-l-4 border-red-400 z-50 flex items-center';
+            } else if (type === 'warning') {
+                notificationIcon.className = 'fa-solid fa-exclamation-triangle text-yellow-500';
+                notification.className = 'fixed top-4 right-4 p-4 rounded-lg shadow-lg transform transition-all duration-300 bg-yellow-50 text-yellow-800 border-l-4 border-yellow-400 z-50 flex items-center';
             } else if (type === 'info') {
-                notification.className = 'fixed top-4 right-4 p-4 rounded-lg shadow-lg transform transition-all duration-300 translate-y-0 opacity-100 z-50 flex items-center bg-blue-500 text-white';
-                notificationIcon.className = 'fa-solid fa-info-circle mr-2 text-xl';
+                notificationIcon.className = 'fa-solid fa-info-circle text-blue-500';
+                notification.className = 'fixed top-4 right-4 p-4 rounded-lg shadow-lg transform transition-all duration-300 bg-blue-50 text-blue-800 border-l-4 border-blue-400 z-50 flex items-center';
             }
             
             // 显示通知
-            notification.style.display = 'flex';
+            notification.style.transform = 'translateY(0)';
+            notification.style.opacity = '1';
             
             // 3秒后隐藏通知
             setTimeout(() => {
                 notification.style.transform = 'translateY(-100px)';
                 notification.style.opacity = '0';
-                setTimeout(() => {
-                    notification.style.display = 'none';
-                }, 300);
             }, 3000);
         }
-        
-        // 从Firebase加载数据
-        function loadDataFromFirebase() {
-            // 获取Firebase数据库引用
-            const dbRef = firebase.database().ref('warehouseData');
-            
-            // 监听数据变化
-            dbRef.on('value', (snapshot) => {
-                const data = snapshot.val();
-                if (data) {
-                    // 将对象转换为数组
-                    warehouseData = Object.values(data);
-                } else {
-                    warehouseData = [];
-                }
-                
-                // 更新UI
-                updateUI();
-                console.log('数据已从Firebase加载');
-            }, (error) => {
-                console.error('从Firebase加载数据时出错:', error);
-                showNotification('加载数据失败，请稍后重试', 'error');
-                
-                // 从本地存储加载备份数据
-                loadDataFromLocalStorage();
-            });
-        }
-        
-        // 将数据保存到Firebase
-        function saveDataToFirebase(record) {
-            // 获取Firebase数据库引用
-            const dbRef = firebase.database().ref('warehouseData');
-            
-            // 生成唯一ID
-            const newRecordRef = dbRef.push();
-            
-            // 保存数据
-            newRecordRef.set(record)
-                .then(() => {
-                    console.log('数据已保存到Firebase');
-                    
-                    // 也保存到本地存储作为备份
-                    saveDataToLocalStorage();
-                })
-                .catch((error) => {
-                    console
+    </script>
+</body>
+</html>
