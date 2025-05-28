@@ -1,67 +1,170 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>仓库库存数据管理系统</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-    <style>
-        /* 这里可以添加你的 CSS 样式 */
-        .sidebar-item {
-            display: flex;
-            align-items: center;
-            padding: 0.75rem 1rem;
-            border-radius: 0.375rem;
-            color: #4b5563;
-            transition: background-color 0.3s ease;
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- 引入 Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+        import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
+
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyB26UN0xUbXuNwT92c24rpqdQgTb6mgZT0",
+            authDomain: "cangkuguanli-57be3.firebaseapp.com",
+            databaseURL: "https://cangkuguanli-57be3-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "cangkuguanli-57be3",
+            storageBucket: "cangkuguanli-57be3.firebasestorage.app",
+            messagingSenderId: "680909943577",
+            appId: "1:680909943577:web:7c01629353fb37a6a10b88",
+            measurementId: "G-R73KJ7BDDD"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        // 示例：保存数据到 Firebase
+        function saveDataToFirebase(data) {
+            const newRecordRef = ref(database, 'warehouseData/' + Date.now());
+            set(newRecordRef, data)
+              .then(() => {
+                    console.log('数据已成功保存到 Firebase');
+                })
+              .catch((error) => {
+                    console.error('保存数据到 Firebase 时出错:', error);
+                });
         }
 
-        .sidebar-item:hover {
-            background-color: #e5e7eb;
+        // 示例：从 Firebase 获取数据
+        function getDataFromFirebase() {
+            const dbRef = ref(database);
+            get(child(dbRef, 'warehouseData'))
+              .then((snapshot) => {
+                    if (snapshot.exists()) {
+                        const data = snapshot.val();
+                        console.log('从 Firebase 获取的数据:', data);
+                    } else {
+                        console.log('未找到数据');
+                    }
+                })
+              .catch((error) => {
+                    console.error('从 Firebase 获取数据时出错:', error);
+                });
         }
 
-        /* 其他样式... */
+        // 你可以在这里调用保存和获取数据的函数
+        // 例如，当表单提交时保存数据
+        const submitButton = document.getElementById('submitButton');
+        submitButton.addEventListener('click', function() {
+            const warehouseName = document.getElementById('warehouseName').value;
+            const maxCapacity = parseFloat(document.getElementById('maxCapacity').value);
+            const currentStock = parseFloat(document.getElementById('currentStock').value);
+            const now = new Date();
+            const formattedDate = now.toISOString().replace('T', ' ').substring(0, 19);
+
+            const newRecord = {
+                仓库名称: warehouseName,
+                最大库容量: maxCapacity,
+                目前库存数: currentStock,
+                日期: formattedDate
+            };
+
+            saveDataToFirebase(newRecord);
+        });
+
+        // 页面加载时获取数据
+        getDataFromFirebase();
+    </script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#64748b',
+                        accent: '#f97316',
+                        neutral: '#f1f5f9',
+                        'neutral-dark': '#334155',
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .transition-custom {
+                transition: all 0.3s ease;
+            }
+            .shadow-custom {
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            }
+            .hover-scale {
+                transition: transform 0.2s ease;
+            }
+            .hover-scale:hover {
+                transform: scale(1.02);
+            }
+            .gradient-bg {
+                background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            }
+            .animate-fade-in {
+                animation: fadeIn 0.5s ease-in-out;
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .sidebar-item {
+                @apply flex items-center px-4 py-3 text-gray-700 hover:bg-primary/10 hover:text-primary rounded-lg transition-custom;
+            }
+            .sidebar-item.active {
+                @apply bg-primary/10 text-primary font-medium;
+            }
+        }
     </style>
 </head>
-
 <body class="font-inter bg-gray-50 min-h-screen flex flex-col">
-    <!-- 侧边栏 -->
-    <div class="hidden md:block w-64 bg-white shadow-md h-screen sticky top-0">
-        <div class="p-4 border-b border-gray-200">
-            <h1 class="text-xl font-semibold text-gray-900">仓库库存管理</h1>
-        </div>
-        <div class="flex flex-col space-y-2">
-            <a href="#data-entry" id="nav-data-entry" class="sidebar-item">
-                <i class="fa-solid fa-pencil-alt mr-3"></i>
-                <span>数据录入</span>
-            </a>
-            <a href="#data-view" id="nav-data-view" class="sidebar-item">
-                <i class="fa-solid fa-table mr-3"></i>
-                <span>数据查看</span>
-            </a>
-            <div id="user-info" class="p-3 bg-gray-100 rounded-lg mt-4">
-                <p class="text-sm font-medium text-gray-700" id="user-display"></p>
+    <!-- 导航栏 -->
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-warehouse text-2xl"></i>
+                <h1 class="text-xl md:text-2xl font-bold">仓库库存数据管理系统</h1>
             </div>
-            <button id="logout-button" class="sidebar-item text-red-500">
-                <i class="fa-solid fa-sign-out-alt mr-3"></i>
-                <span>退出登录</span>
+            <div class="hidden md:flex items-center space-x-6">
+                <a href="#data-entry" id="nav-data-entry" class="text-white hover:text-blue-200 transition-custom font-medium">数据录入</a>
+                <a href="#data-view" id="nav-data-view" class="text-white hover:text-blue-200 transition-custom font-medium">数据查看</a>
+                <span id="user-info" class="hidden font-medium"></span>
+                <button id="logout-button" class="hidden px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg transition-custom">退出登录</button>
+            </div>
+            <button id="mobile-menu-button" class="md:hidden text-white">
+                <i class="fa-solid fa-bars text-xl"></i>
             </button>
         </div>
-    </div>
+    </header>
 
     <!-- 移动端菜单 -->
-    <div class="md:hidden bg-white shadow-md">
-        <div class="p-4 flex justify-between items-center">
-            <h1 class="text-xl font-semibold text-gray-900">仓库库存管理</h1>
-            <button id="mobile-menu-button">
-                <i class="fa-solid fa-bars"></i>
-            </button>
-        </div>
-        <div id="mobile-menu" class="hidden p-4 bg-white shadow-md">
-            <button id="close-mobile-menu">
-                <i class="fa-solid fa-times"></i>
-            </button>
+    <div id="mobile-menu" class="fixed inset-0 bg-black bg-opacity-50 z-40 transform translate-x-full transition-transform duration-300 md:hidden">
+        <div class="bg-white h-full w-64 shadow-lg p-4 flex flex-col">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-lg font-semibold text-gray-900">菜单</h3>
+                <button id="close-mobile-menu" class="text-gray-500">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
             <div class="flex flex-col space-y-2">
                 <a href="#data-entry" id="mobile-nav-data-entry" class="sidebar-item">
                     <i class="fa-solid fa-pencil-alt mr-3"></i>
@@ -83,15 +186,13 @@
     </div>
 
     <!-- 状态通知 -->
-    <div id="notification"
-        class="fixed top-4 right-4 p-4 rounded-lg shadow-lg transform transition-all duration-300 translate-y-[-100px] opacity-0 z-50 flex items-center">
+    <div id="notification" class="fixed top-4 right-4 p-4 rounded-lg shadow-lg transform transition-all duration-300 translate-y-[-100px] opacity-0 z-50 flex items-center">
         <i id="notification-icon" class="mr-2 text-xl"></i>
         <span id="notification-message"></span>
     </div>
 
     <!-- 登录模态框 -->
-    <div id="login-modal"
-        class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+    <div id="login-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
         <div class="bg-white rounded-xl shadow-xl w-full max-w-md animate-fade-in">
             <div class="p-6 border-b border-gray-200">
                 <h3 class="text-lg font-semibold text-gray-900">登录系统</h3>
@@ -99,19 +200,14 @@
             <div class="p-6">
                 <form id="login-form" class="space-y-4">
                     <div>
-                        <label for="username"
-                            class="block text-sm font-medium text-gray-700 mb-1">用户名</label>
-                        <input type="text" id="username" placeholder="请输入用户名"
-                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-custom">
+                        <label for="username" class="block text-sm font-medium text-gray-700 mb-1">用户名</label>
+                        <input type="text" id="username" placeholder="请输入用户名" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-custom">
                     </div>
                     <div>
-                        <label for="password"
-                            class="block text-sm font-medium text-gray-700 mb-1">密码</label>
-                        <input type="password" id="password" placeholder="请输入密码"
-                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-custom">
+                        <label for="password" class="block text-sm font-medium text-gray-700 mb-1">密码</label>
+                        <input type="password" id="password" placeholder="请输入密码" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-custom">
                     </div>
-                    <button type="button" id="login-button"
-                        class="w-full px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-custom">
+                    <button type="button" id="login-button" class="w-full px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-custom">
                         登录
                     </button>
                 </form>
@@ -128,15 +224,13 @@
                     <i class="fa-solid fa-plus-circle text-primary mr-2"></i>
                     新增仓库库存记录
                 </h2>
-
+                
                 <form id="warehouseForm" class="space-y-6">
                     <!-- 仓库名称 -->
                     <div>
-                        <label for="warehouseName"
-                            class="block text-sm font-medium text-gray-700 mb-2">仓库名称</label>
+                        <label for="warehouseName" class="block text-sm font-medium text-gray-700 mb-2">仓库名称</label>
                         <div class="relative">
-                            <select id="warehouseName"
-                                class="block w-full pl-3 pr-10 py-3 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-lg transition-custom">
+                            <select id="warehouseName" class="block w-full pl-3 pr-10 py-3 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-lg transition-custom">
                                 <option value="">请选择仓库</option>
                                 <!-- 仓库选项将通过JavaScript动态填充 -->
                             </select>
@@ -145,28 +239,21 @@
                             </div>
                         </div>
                     </div>
-
+                    
                     <!-- 最大库容量 -->
                     <div>
-                        <label for="maxCapacity"
-                            class="block text-sm font-medium text-gray-700 mb-2">最大库容量（板）</label>
-                        <input type="number" id="maxCapacity" placeholder="请输入最大库容量"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-custom"
-                            min="0" step="1">
+                        <label for="maxCapacity" class="block text-sm font-medium text-gray-700 mb-2">最大库容量（板）</label>
+                        <input type="number" id="maxCapacity" placeholder="请输入最大库容量" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-custom" min="0" step="1">
                     </div>
-
+                    
                     <!-- 目前库存数 -->
                     <div>
-                        <label for="currentStock"
-                            class="block text-sm font-medium text-gray-700 mb-2">目前库存数（板）</label>
-                        <input type="number" id="currentStock" placeholder="请输入目前库存数"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-custom"
-                            min="0" step="1">
+                        <label for="currentStock" class="block text-sm font-medium text-gray-700 mb-2">目前库存数（板）</label>
+                        <input type="number" id="currentStock" placeholder="请输入目前库存数" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-custom" min="0" step="1">
                     </div>
-
+                    
                     <div class="flex justify-center">
-                        <button type="button" id="submitButton"
-                            class="w-full md:w-auto px-8 py-3 bg-primary text-white rounded-lg font-medium shadow-md hover:bg-primary/90 transition-custom flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
+                        <button type="button" id="submitButton" class="w-full md:w-auto px-8 py-3 bg-primary text-white rounded-lg font-medium shadow-md hover:bg-primary/90 transition-custom flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
                             <i class="fa-solid fa-save mr-2"></i>
                             提交数据
                         </button>
@@ -178,8 +265,7 @@
         <!-- 数据查看页面 -->
         <section id="data-view-page" class="max-w-6xl mx-auto hidden">
             <!-- 当天未填写仓库提示 -->
-            <div id="missingWarehousesAlert"
-                class="mt-4 max-w-2xl mx-auto bg-red-50 border-l-4 border-red-400 p-4 animate-fade-in hidden">
+            <div id="missingWarehousesAlert" class="mt-4 max-w-2xl mx-auto bg-red-50 border-l-4 border-red-400 p-4 animate-fade-in hidden">
                 <div class="flex">
                     <div class="flex-shrink-0">
                         <i class="fa-solid fa-exclamation-triangle text-red-500"></i>
@@ -200,33 +286,30 @@
                         <i class="fa-solid fa-file-excel text-primary mr-2"></i>
                         数据操作
                     </h2>
-
+                    
                     <div class="flex flex-col gap-4">
-                        <button id="downloadButton"
-                            class="px-4 py-3 bg-primary text-white rounded-lg font-medium shadow-md hover:bg-primary/90 transition-custom flex items-center justify-center">
+                        <button id="downloadButton" class="px-4 py-3 bg-primary text-white rounded-lg font-medium shadow-md hover:bg-primary/90 transition-custom flex items-center justify-center">
                             <i class="fa-solid fa-download mr-2"></i>
                             下载Excel
                         </button>
-                        <button id="clearButton"
-                            class="px-4 py-3 bg-gray-200 text-gray-800 rounded-lg font-medium shadow-md hover:bg-gray-300 transition-custom flex items-center justify-center">
+                        <button id="clearButton" class="px-4 py-3 bg-gray-200 text-gray-800 rounded-lg font-medium shadow-md hover:bg-gray-300 transition-custom flex items-center justify-center">
                             <i class="fa-solid fa-trash mr-2"></i>
                             清空数据
                         </button>
-                        <button id="manageWarehousesButton"
-                            class="px-4 py-3 bg-accent text-white rounded-lg font-medium shadow-md hover:bg-accent/90 transition-custom flex items-center justify-center">
+                        <button id="manageWarehousesButton" class="px-4 py-3 bg-accent text-white rounded-lg font-medium shadow-md hover:bg-accent/90 transition-custom flex items-center justify-center">
                             <i class="fa-solid fa-cog mr-2"></i>
                             管理仓库
                         </button>
                     </div>
                 </div>
-
+                
                 <!-- 库存状态概览 -->
                 <div class="lg:col-span-2 bg-white rounded-xl shadow-custom p-6 hover-scale animate-fade-in">
                     <h2 class="text-lg font-semibold text-neutral-dark mb-4 flex items-center">
                         <i class="fa-solid fa-chart-pie text-primary mr-2"></i>
                         库存状态概览
                     </h2>
-
+                    
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="w-full max-w-md h-64">
                             <canvas id="inventoryChart"></canvas>
@@ -252,30 +335,24 @@
                     </div>
                 </div>
             </div>
-
+            
             <!-- 仓库库存详情 -->
             <div class="bg-white rounded-xl shadow-custom p-6 hover-scale animate-fade-in">
                 <h2 class="text-lg font-semibold text-neutral-dark mb-4 flex items-center">
                     <i class="fa-solid fa-table text-primary mr-2"></i>
                     仓库库存详情
                 </h2>
-
+                
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">仓库名称</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最大容量</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">当前库存</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">使用率</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最后更新</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">仓库名称</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最大容量</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">当前库存</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">使用率</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最后更新</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
                             </tr>
                         </thead>
                         <tbody id="warehouseTableBody" class="bg-white divide-y divide-gray-200">
@@ -283,7 +360,7 @@
                         </tbody>
                     </table>
                 </div>
-
+                
                 <div id="noDataMessage" class="py-8 text-center hidden">
                     <i class="fa-solid fa-box-open text-4xl text-gray-300 mb-4"></i>
                     <p class="text-gray-500">暂无仓库库存数据</p>
@@ -293,8 +370,7 @@
     </main>
 
     <!-- 管理仓库模态框 -->
-    <div id="manageWarehousesModal"
-        class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+    <div id="manageWarehousesModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
         <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] overflow-y-auto animate-fade-in">
             <div class="p-6 border-b border-gray-200">
                 <div class="flex justify-between items-center">
@@ -308,23 +384,20 @@
                 <div class="mb-6">
                     <h4 class="text-sm font-medium text-gray-700 mb-2">添加新仓库</h4>
                     <div class="flex">
-                        <input type="text" id="newWarehouseName" placeholder="输入新仓库名称"
-                            class="flex-1 px-4 py-2 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-custom">
-                        <button id="addWarehouseButton"
-                            class="px-4 py-2 bg-primary text-white rounded-r-lg font-medium hover:bg-primary/90 transition-custom">
+                        <input type="text" id="newWarehouseName" placeholder="输入新仓库名称" class="flex-1 px-4 py-2 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-custom">
+                        <button id="addWarehouseButton" class="px-4 py-2 bg-primary text-white rounded-r-lg font-medium hover:bg-primary/90 transition-custom">
                             添加
                         </button>
                     </div>
                 </div>
-
+                
                 <h4 class="text-sm font-medium text-gray-700 mb-3">现有仓库</h4>
                 <div id="warehouseList" class="space-y-2 max-h-[40vh] overflow-y-auto">
                     <!-- 仓库列表将通过JavaScript动态填充 -->
                 </div>
             </div>
             <div class="p-6 border-t border-gray-200 flex justify-end">
-                <button id="closeManageWarehousesBtn"
-                    class="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300 transition-custom">
+                <button id="closeManageWarehousesBtn" class="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300 transition-custom">
                     关闭
                 </button>
             </div>
@@ -332,8 +405,7 @@
     </div>
 
     <!-- 编辑仓库模态框 -->
-    <div id="editWarehouseModal"
-        class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+    <div id="editWarehouseModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
         <div class="bg-white rounded-xl shadow-xl w-full max-w-md animate-fade-in">
             <div class="p-6 border-b border-gray-200">
                 <div class="flex justify-between items-center">
@@ -346,19 +418,15 @@
             <div class="p-6">
                 <input type="hidden" id="warehouseId">
                 <div class="mb-4">
-                    <label for="editWarehouseName"
-                        class="block text-sm font-medium text-gray-700 mb-2">仓库名称</label>
-                    <input type="text" id="editWarehouseName" placeholder="输入仓库名称"
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-custom">
+                    <label for="editWarehouseName" class="block text-sm font-medium text-gray-700 mb-2">仓库名称</label>
+                    <input type="text" id="editWarehouseName" placeholder="输入仓库名称" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-custom">
                 </div>
             </div>
             <div class="p-6 border-t border-gray-200 flex justify-end space-x-3">
-                <button id="deleteWarehouseButton"
-                    class="px-6 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-custom">
+                <button id="deleteWarehouseButton" class="px-6 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-custom">
                     删除
                 </button>
-                <button id="saveWarehouseButton"
-                    class="px-6 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-custom">
+                <button id="saveWarehouseButton" class="px-6 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-custom">
                     保存
                 </button>
             </div>
@@ -370,338 +438,5 @@
             <p class="text-sm">© 2025 仓库库存数据管理系统. 保留所有权利.</p>
         </div>
     </footer>
-
-    <script type="module">
-        import { app, database } from './src/firebase.js';
-        import { ref, set, get, child, update, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-
-        // 全局变量
-        let warehouseData = [];
-        let warehouses = [];
-        let inventoryChart = null;
-        const sheetName = '仓库库存数据';
-        // 模拟用户数据
-        const users = {
-            'cangku': 'cangku123',
-            'cangku01': 'cangku123'
-        };
-        let currentUser = null;
-
-        // DOM 元素
-        const dataEntryPage = document.getElementById('data-entry-page');
-        const dataViewPage = document.getElementById('data-view-page');
-        const navDataEntry = document.getElementById('nav-data-entry');
-        const navDataView = document.getElementById('nav-data-view');
-        const mobileNavDataEntry = document.getElementById('mobile-nav-data-entry');
-        const mobileNavDataView = document.getElementById('mobile-nav-data-view');
-        const mobileMenuButton = document.getElementById('mobile-menu-button');
-        const mobileMenu = document.getElementById('mobile-menu');
-        const closeMobileMenu = document.getElementById('close-mobile-menu');
-
-        const warehouseForm = document.getElementById('warehouseForm');
-        const warehouseName = document.getElementById('warehouseName');
-        const maxCapacity = document.getElementById('maxCapacity');
-        const currentStock = document.getElementById('currentStock');
-        const submitButton = document.getElementById('submitButton');
-        const downloadButton = document.getElementById('downloadButton');
-        const clearButton = document.getElementById('clearButton');
-        const manageWarehousesButton = document.getElementById('manageWarehousesButton');
-
-        const notification = document.getElementById('notification');
-        const notificationMessage = document.getElementById('notification-message');
-        const notificationIcon = document.getElementById('notification-icon');
-
-        const warehouseTableBody = document.getElementById('warehouseTableBody');
-        const noDataMessage = document.getElementById('noDataMessage');
-        const missingWarehousesAlert = document.getElementById('missingWarehousesAlert');
-        const missingWarehousesList = document.getElementById('missingWarehousesList');
-
-        const totalCapacityEl = document.getElementById('totalCapacity');
-        const totalStockEl = document.getElementById('totalStock');
-        const averageUsageEl = document.getElementById('averageUsage');
-        const warningCountEl = document.getElementById('warningCount');
-
-        const manageWarehousesModal = document.getElementById('manageWarehousesModal');
-        const closeManageWarehousesModal = document.getElementById('closeManageWarehousesModal');
-        const closeManageWarehousesBtn = document.getElementById('closeManageWarehousesBtn');
-        const newWarehouseName = document.getElementById('newWarehouseName');
-        const addWarehouseButton = document.getElementById('addWarehouseButton');
-        const warehouseList = document.getElementById('warehouseList');
-
-        const editWarehouseModal = document.getElementById('editWarehouseModal');
-        const closeEditWarehouseModal = document.getElementById('closeEditWarehouseModal');
-        const warehouseId = document.getElementById('warehouseId');
-        const editWarehouseName = document.getElementById('editWarehouseName');
-
-        // 显示通知
-        function showNotification(message, type) {
-            notificationIcon.className = `fa-solid ${type === 'success' ? 'fa-check-circle text-green-500' : 'fa-exclamation-triangle text-red-500'}`;
-            notificationMessage.textContent = message;
-            notification.classList.remove('translate-y-[-100px]', 'opacity-0');
-            setTimeout(() => {
-                notification.classList.add('translate-y-[-100px]', 'opacity-0');
-            }, 3000);
-        }
-
-        // 获取仓库列表
-        async function getWarehouses() {
-            const dbRef = ref(database);
-            try {
-                const snapshot = await get(child(dbRef, 'warehouses'));
-                if (snapshot.exists()) {
-                    warehouses = Object.values(snapshot.val());
-                    populateWarehouseSelect();
-                    populateWarehouseList();
-                } else {
-                    warehouses = [];
-                }
-            } catch (error) {
-                console.error('获取仓库列表失败:', error);
-            }
-        }
-
-        // 填充仓库选择框
-        function populateWarehouseSelect() {
-            warehouseName.innerHTML = '<option value="">请选择仓库</option>';
-            warehouses.forEach(warehouse => {
-                const option = document.createElement('option');
-                option.value = warehouse.name;
-                option.textContent = warehouse.name;
-                warehouseName.appendChild(option);
-            });
-        }
-
-        // 填充仓库列表
-        function populateWarehouseList() {
-            warehouseList.innerHTML = '';
-            warehouses.forEach(warehouse => {
-                const listItem = document.createElement('div');
-                listItem.className = 'flex justify-between items-center p-3 bg-gray-100 rounded-lg';
-                listItem.innerHTML = `
-                    <span>${warehouse.name}</span>
-                    <div class="flex space-x-2">
-                        <button class="text-blue-500" onclick="editWarehouse('${warehouse.id}')">编辑</button>
-                        <button class="text-red-500" onclick="deleteWarehouse('${warehouse.id}')">删除</button>
-                    </div>
-                `;
-                warehouseList.appendChild(listItem);
-            });
-        }
-
-        // 编辑仓库
-        window.editWarehouse = async function (id) {
-            const dbRef = ref(database);
-            try {
-                const snapshot = await get(child(dbRef, `warehouses/${id}`));
-                if (snapshot.exists()) {
-                    const warehouse = snapshot.val();
-                    warehouseId.value = id;
-                    editWarehouseName.value = warehouse.name;
-                    editWarehouseModal.classList.remove('hidden');
-                }
-            } catch (error) {
-                console.error('获取仓库信息失败:', error);
-            }
-        };
-
-        // 删除仓库
-        window.deleteWarehouse = async function (id) {
-            if (confirm('确定要删除这个仓库吗？')) {
-                const dbRef = ref(database, `warehouses/${id}`);
-                try {
-                    await remove(dbRef);
-                    showNotification('仓库删除成功', 'success');
-                    await getWarehouses();
-                } catch (error) {
-                    console.error('删除仓库失败:', error);
-                    showNotification('仓库删除失败', 'error');
-                }
-            }
-        };
-
-        // 保存仓库信息
-        async function saveWarehouse() {
-            const id = warehouseId.value;
-            const name = editWarehouseName.value;
-            if (name) {
-                const dbRef = ref(database, `warehouses/${id}`);
-                try {
-                    await update(dbRef, { name });
-                    showNotification('仓库信息保存成功', 'success');
-                    editWarehouseModal.classList.add('hidden');
-                    await getWarehouses();
-                } catch (error) {
-                    console.error('保存仓库信息失败:', error);
-                    showNotification('仓库信息保存失败', 'error');
-                }
-            }
-        }
-
-        // 添加新仓库
-        async function addNewWarehouse() {
-            const name = newWarehouseName.value;
-            if (name) {
-                const newWarehouseRef = ref(database, 'warehouses').push();
-                const newWarehouse = {
-                    id: newWarehouseRef.key,
-                    name
-                };
-                try {
-                    await set(newWarehouseRef, newWarehouse);
-                    showNotification('新仓库添加成功', 'success');
-                    newWarehouseName.value = '';
-                    await getWarehouses();
-                } catch (error) {
-                    console.error('添加新仓库失败:', error);
-                    showNotification('新仓库添加失败', 'error');
-                }
-            }
-        }
-
-        // 提交仓库数据
-        async function submitWarehouseData() {
-            const name = warehouseName.value;
-            const maxCap = parseInt(maxCapacity.value);
-            const current = parseInt(currentStock.value);
-            if (name &&!isNaN(maxCap) &&!isNaN(current)) {
-                const newDataRef = ref(database, 'warehouseData').push();
-                const newData = {
-                    id: newDataRef.key,
-                    name,
-                    maxCapacity: maxCap,
-                    currentStock: current,
-                    lastUpdated: new Date().toLocaleString()
-                };
-                try {
-                    await set(newDataRef, newData);
-                    showNotification('数据提交成功', 'success');
-                    warehouseForm.reset();
-                    await loadWarehouseData();
-                } catch (error) {
-                    console.error('数据提交失败:', error);
-                    showNotification('数据提交失败', 'error');
-                }
-            }
-        }
-
-        // 加载仓库数据
-        async function loadWarehouseData() {
-            const dbRef = ref(database);
-            try {
-                const snapshot = await get(child(dbRef, 'warehouseData'));
-                if (snapshot.exists()) {
-                    warehouseData = Object.values(snapshot.val());
-                    populateWarehouseTable();
-                    updateInventorySummary();
-                } else {
-                    warehouseData = [];
-                    warehouseTableBody.innerHTML = '';
-                    noDataMessage.classList.remove('hidden');
-                }
-            } catch (error) {
-                console.error('加载仓库数据失败:', error);
-            }
-        }
-
-        // 填充仓库表格
-        function populateWarehouseTable() {
-            warehouseTableBody.innerHTML = '';
-            if (warehouseData.length > 0) {
-                noDataMessage.classList.add('hidden');
-                warehouseData.forEach(data => {
-                    const row = document.createElement('tr');
-                    const usage = (data.currentStock / data.maxCapacity * 100).toFixed(2) + '%';
-                    const status = data.currentStock / data.maxCapacity > 0.8 ? '高' : '正常';
-                    row.innerHTML = `
-                        <td class="px-6 py-4 whitespace-nowrap">${data.name}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">${data.maxCapacity}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">${data.currentStock}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">${usage}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">${data.lastUpdated}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">${status}</td>
-                    `;
-                    warehouseTableBody.appendChild(row);
-                });
-            } else {
-                noDataMessage.classList.remove('hidden');
-            }
-        }
-
-        // 更新库存摘要
-        function updateInventorySummary() {
-            let totalCap = 0;
-            let totalStk = 0;
-            let warningCnt = 0;
-            warehouseData.forEach(data => {
-                totalCap += data.maxCapacity;
-                totalStk += data.currentStock;
-                if (data.currentStock / data.maxCapacity > 0.8) {
-                    warningCnt++;
-                }
-            });
-            const avgUsage = totalCap > 0 ? ((totalStk / totalCap) * 100).toFixed(2) + '%' : '0%';
-            totalCapacityEl.textContent = totalCap + ' 板';
-            totalStockEl.textContent = totalStk + ' 板';
-            averageUsageEl.textContent = avgUsage;
-            warningCountEl.textContent = warningCnt;
-        }
-
-        // 事件监听器
-        navDataEntry.addEventListener('click', () => {
-            dataEntryPage.classList.remove('hidden');
-            dataViewPage.classList.add('hidden');
-        });
-
-        navDataView.addEventListener('click', async () => {
-            dataEntryPage.classList.add('hidden');
-            dataViewPage.classList.remove('hidden');
-            await loadWarehouseData();
-        });
-
-        mobileNavDataEntry.addEventListener('click', () => {
-            dataEntryPage.classList.remove('hidden');
-            dataViewPage.classList.add('hidden');
-            mobileMenu.classList.add('hidden');
-        });
-
-        mobileNavDataView.addEventListener('click', async () => {
-            dataEntryPage.classList.add('hidden');
-            dataViewPage.classList.remove('hidden');
-            mobileMenu.classList.add('hidden');
-            await loadWarehouseData();
-        });
-
-        mobileMenuButton.addEventListener('click', () => {
-            mobileMenu.classList.remove('hidden');
-        });
-
-        closeMobileMenu.addEventListener('click', () => {
-            mobileMenu.classList.add('hidden');
-        });
-
-        submitButton.addEventListener('click', submitWarehouseData);
-        addWarehouseButton.addEventListener('click', addNewWarehouse);
-        saveWarehouseButton.addEventListener('click', saveWarehouse);
-        closeManageWarehousesModal.addEventListener('click', () => {
-            manageWarehousesModal.classList.add('hidden');
-        });
-        closeManageWarehousesBtn.addEventListener('click', () => {
-            manageWarehousesModal.classList.add('hidden');
-        });
-        closeEditWarehouseModal.addEventListener('click', () => {
-            editWarehouseModal.classList.add('hidden');
-        });
-        manageWarehousesButton.addEventListener('click', () => {
-            manageWarehousesModal.classList.remove('hidden');
-        });
-
-        // 初始化
-        async function init() {
-            await getWarehouses();
-        }
-
-        init();
-    </script>
 </body>
-
 </html>
